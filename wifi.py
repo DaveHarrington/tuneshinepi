@@ -5,24 +5,58 @@ from machine import Pin
 
 from wifi_conf import WIFI_SSID, WIFI_PASSWORD
 
-def get_tuneshine_state_request(oled, debug=False):
-    
-    def show(s):
-        oled.fill(0)
-        oled.text("|Tuneshine|", 15, 5)
-        oled.text("----------------", 0, 30)
-        oled.text(s, 0, 45)
-        oled.show()
+led = Pin(7, Pin.OUT)
 
-    # Connect to Wi-Fi
+def connect_wifi(ssid, password):
+    # Initialize WiFi interface
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
-
-    # Wait for connection
-    while not wlan.isconnected():
-        show("Connecting...")
+    
+    # Reset networking for clean connection
+#    wlan.deinit()
+#    time.sleep(1)
+#    wlan = network.WLAN(network.STA_IF)
+#    wlan.active(True)
+    
+    # Scan for networks (optional but useful for debugging)
+#    networks = wlan.scan()
+#    print("Available networks:")
+#    for net in networks:
+#        print(net[0].decode())
+    
+    # Connect to WiFi
+    print(f"\nConnecting to {ssid}...")
+    wlan.connect(ssid, password)
+    
+    # Wait for connection with timeout
+    max_wait = 10
+    while max_wait > 0:
+        if wlan.status() < 0 or wlan.status() >= 3:
+            break
+        max_wait -= 1
+        print("Waiting for connection...")
+        led.toggle()  # Blink LED while connecting
         time.sleep(1)
+    
+    if wlan.status() != 3:
+        led.off()
+        return None
+    
+    else:
+        status = wlan.ifconfig()
+        print('\nConnection successful!')
+        print(f'IP Address: {status[0]}')
+        return wlan
+    
+        
+def get_tuneshine_state_request(debug=False):
+    led.on()
+
+    wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
+    
+    if not wlan:
+        led.off()
+        return
 
     print("Connected to Wi-Fi:", wlan.ifconfig())
 
@@ -32,10 +66,11 @@ def get_tuneshine_state_request(oled, debug=False):
     val = response.text
     response.close()
     
-    show("Response:" + val)
-    
     print("Disable Wifi")
     wlan.disconnect()
     wlan.active(False)
+    led.off()
+    
+    print(f"Got {val.strip()}")
 
     return val.strip() == "1"
