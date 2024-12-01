@@ -47,21 +47,17 @@ def connect_wifi(ssid, password):
         print('\nConnection successful!')
         print(f'IP Address: {status[0]}')
         return wlan
-    
         
-def get_tuneshine_state_request(debug=False):
-    led.on()
-
+def get_tuneshine_state_request():
     wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
-    
+        
     if not wlan:
-        led.off()
-        return
-
+        return False
+    
     print("Connected to Wi-Fi:", wlan.ifconfig())
-
+    
     # Make a GET request
-    url = 'http://192.168.4.140:8000/'
+    url = 'http://192.168.4.140:8000/playing'
     response = urequests.get(url)
     val = response.text
     response.close()
@@ -69,8 +65,18 @@ def get_tuneshine_state_request(debug=False):
     print("Disable Wifi")
     wlan.disconnect()
     wlan.active(False)
-    led.off()
-    
+
     print(f"Got {val.strip()}")
 
     return val.strip() == "1"
+
+def send_log(log_json_str):
+    wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
+
+    # Make a GET request
+    url = 'http://192.168.4.140:8000/log'
+    urequests.post(url, headers = {'content-type': 'application/json'}, data = log_json_str)
+    urequests.put(url)
+    
+    wlan.disconnect()
+    wlan.active(False)
