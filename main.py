@@ -9,9 +9,17 @@ from machine import I2C
 
 import network
 import wifi
+import set_rtc
 
 relay_pin = Pin(19, Pin.OUT)
 led_pin = Pin(8, Pin.OUT)
+
+print("Start up delay - 3s")
+# Delay to allow interupting before Watchdog is enabled
+time.sleep(3)
+# Watchdog seems to be limited to about 9 seconds
+wdt = WDT(timeout=9 * 1000)
+wdt.feed()
 
 def get_reset_cause():
     """Get the reason for the last reset"""
@@ -25,12 +33,12 @@ def get_reset_cause():
     
 print(f"Last reset cause: {get_reset_cause()}")
 wifi.send_log(ujson.dumps({"last_reset": get_reset_cause()}))
+wdt.feed()
 
-print("Starting...")
-# Delay to allow interupting before Watchdog is enabled
-time.sleep(3)
-# Watchdog seems to be limited to about 9 seconds
-wdt = WDT(timeout=9 * 1000)
+try:
+    set_rtc.set_time()
+except:
+    raise
 wdt.feed()
 
 while True:
@@ -56,7 +64,12 @@ while True:
             wdt.feed()
             
     except Exception as e:
+        adjusted = time.localtime(time.mktime(time.localtime()) - 8*3600)
         with open("error.log", "w+") as f:
+            f.write("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}\n".format(
+                adjusted[0], adjusted[1], adjusted[2],
+                adjusted[3], adjusted[4], adjusted[5]))
             f.write(traceback.format_exception(e))
             
         wifi.send_log(ujson.dumps({"exception": traceback.format_exception(e)}))
+        raise
