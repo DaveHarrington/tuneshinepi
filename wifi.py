@@ -7,7 +7,7 @@ from wifi_conf import WIFI_SSID, WIFI_PASSWORD
 
 led = Pin(7, Pin.OUT)
 
-def connect_wifi(ssid, password):
+def connect_wifi(ssid, password, wdt):
     # Initialize WiFi interface
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
@@ -31,12 +31,15 @@ def connect_wifi(ssid, password):
     # Wait for connection with timeout
     max_wait = 10
     while max_wait > 0:
+        wdt.feed()
         if wlan.status() < 0 or wlan.status() >= 3:
             break
         max_wait -= 1
         print("Waiting for connection...")
         led.toggle()  # Blink LED while connecting
         time.sleep(1)
+    
+    wdt.feed()
     
     if wlan.status() != 3:
         led.off()
@@ -48,8 +51,8 @@ def connect_wifi(ssid, password):
         print(f'IP Address: {status[0]}')
         return wlan
         
-def get_tuneshine_state_request():
-    wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
+def get_tuneshine_state_request(wdt):
+    wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD, wdt)
         
     if not wlan:
         return False
@@ -70,8 +73,8 @@ def get_tuneshine_state_request():
 
     return val.strip() == "1"
 
-def send_log(log_json_str):
-    wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD)
+def send_log(log_json_str, wdt):
+    wlan = connect_wifi(WIFI_SSID, WIFI_PASSWORD, wdt)
 
     # Make a GET request
     url = 'http://192.168.4.140:8000/log'

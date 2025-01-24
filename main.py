@@ -17,8 +17,12 @@ led_pin = Pin(8, Pin.OUT)
 print("Start up delay - 3s")
 # Delay to allow interupting before Watchdog is enabled
 time.sleep(3)
-# Watchdog seems to be limited to about 9 seconds
-wdt = WDT(timeout=9 * 1000)
+# Watchdog is limited to 8388ms
+wdt = WDT(timeout=8388)
+class WDT:
+    def feed(self):
+        pass
+#wdt = WDT()
 wdt.feed()
 
 def get_reset_cause():
@@ -30,27 +34,33 @@ def get_reset_cause():
     }
 
     return causes.get(cause, "Unknown reset cause")
-    
+
 print(f"Last reset cause: {get_reset_cause()}")
-wifi.send_log(ujson.dumps({"last_reset": get_reset_cause()}))
+wifi.send_log(ujson.dumps({"last_reset": get_reset_cause()}), wdt)
 wdt.feed()
 
-try:
-    set_rtc.set_time()
-except:
-    raise
-wdt.feed()
+print("Write last error")
+with open("error.log", "w+") as f:
+    error = f.readlines()
+    print(error)
+    if error:
+        print("sending error")
+        wifi.send_log(ujson.dumps({"last_error": error}), wdt)
+        f.write("")
 
-while True:
+count = 0
+while count < 30:
+    count += 1
     try:
         print("Get state request for Tuneshine")
         
-        requested_state = wifi.get_tuneshine_state_request()
+        requested_state = wifi.get_tuneshine_state_request(wdt)
         
         if requested_state:
             print("Requested to be on")
             relay_pin.on()
             led_pin.on()
+            count = 0
 
         else:
             print("Requested to be off")
@@ -59,17 +69,15 @@ while True:
         
         wdt.feed()
         print("Sleep 56")
-        for i in range(7):
-            time.sleep(8)
+        for i in range(8):
+            time.sleep(7)
             wdt.feed()
             
     except Exception as e:
-        adjusted = time.localtime(time.mktime(time.localtime()) - 8*3600)
+
         with open("error.log", "w+") as f:
-            f.write("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}\n".format(
-                adjusted[0], adjusted[1], adjusted[2],
-                adjusted[3], adjusted[4], adjusted[5]))
             f.write(traceback.format_exception(e))
-            
-        wifi.send_log(ujson.dumps({"exception": traceback.format_exception(e)}))
-        raise
+        time.sleep(1)
+        machine.reset()
+
+machine.reset()
