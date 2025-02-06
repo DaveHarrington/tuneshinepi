@@ -17,12 +17,14 @@ led_pin = Pin(8, Pin.OUT)
 print("Start up delay - 3s")
 # Delay to allow interupting before Watchdog is enabled
 time.sleep(3)
+print("Starting")
+
 # Watchdog is limited to 8388ms
-wdt = WDT(timeout=8388)
+#wdt = WDT(timeout=8388)
 class WDT:
     def feed(self):
         pass
-#wdt = WDT()
+wdt = WDT()
 wdt.feed()
 
 def get_reset_cause():
@@ -48,19 +50,29 @@ with open("error.log", "w+") as f:
         wifi.send_log(ujson.dumps({"last_error": error}), wdt)
         f.write("")
 
-count = 0
-while count < 30:
+# Turn on on startup, in case a series of watchdog resets mean we dont get to it
+count = 30
+while True:
     count += 1
     try:
         print("Get state request for Tuneshine")
         
         requested_state = wifi.get_tuneshine_state_request(wdt)
         
+        # Turn on once every half hour, to keep battery from going to sleep
         if requested_state:
             print("Requested to be on")
             relay_pin.on()
             led_pin.on()
             count = 0
+        elif count >= 30:
+            count = 0
+            wifi.send_log(ujson.dumps({"power_bump": True}), wdt)
+            relay_pin.on()
+            
+            wdt.feed()
+            machine.lightsleep(5000)
+            relay_pin.off()
 
         else:
             print("Requested to be off")
@@ -70,7 +82,7 @@ while count < 30:
         wdt.feed()
         print("Sleep 56")
         for i in range(8):
-            time.sleep(7)
+            machine.lightsleep(7000)
             wdt.feed()
             
     except Exception as e:
@@ -79,5 +91,3 @@ while count < 30:
             f.write(traceback.format_exception(e))
         time.sleep(1)
         machine.reset()
-
-machine.reset()
