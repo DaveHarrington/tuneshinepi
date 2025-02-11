@@ -10,6 +10,4 @@ Using Thonny, upload the py files. Add SSID and password to wifi.conf
 
 ## Notes
 
-Power bank will need to be in low power mode - usually by holding the power button down. On mine, the % display will stay on, and single digit will "circle" every few seconds.
-
-Tuneshine USB-A power has to be in the high-power slot of the power bank - furthest from the USB C port
+Battery will shut-off port when too low a current is drawn for a minute or so. Only way to reset the port is to take current to 0.

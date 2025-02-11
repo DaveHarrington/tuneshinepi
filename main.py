@@ -11,8 +11,9 @@ import network
 import wifi
 import set_rtc
 
-relay_pin = Pin(19, Pin.OUT)
-led_pin = Pin(8, Pin.OUT)
+tuneshine_pin = Pin(19, Pin.OUT)
+power_relay_pin = Pin(0, Pin.OUT)
+power_relay_pin.on()
 
 print("Start up delay - 3s")
 # Delay to allow interupting before Watchdog is enabled
@@ -20,11 +21,11 @@ time.sleep(3)
 print("Starting")
 
 # Watchdog is limited to 8388ms
-#wdt = WDT(timeout=8388)
+wdt = WDT(timeout=8388)
 class WDT:
     def feed(self):
         pass
-wdt = WDT()
+# wdt = WDT()
 wdt.feed()
 
 def get_reset_cause():
@@ -50,44 +51,40 @@ with open("error.log", "w+") as f:
         wifi.send_log(ujson.dumps({"last_error": error}), wdt)
         f.write("")
 
-# Turn on on startup, in case a series of watchdog resets mean we dont get to it
-count = 30
+def trip_power():
+    print("Requested power relay: off")
+    power_relay_pin.off()
+    machine.lightsleep(1000)
+    print("Requested power relay: on")
+    power_relay_pin.on()
+    
+count = 0
+tuneshine_state = False
 while True:
     count += 1
-    try:
-        print("Get state request for Tuneshine")
+    print("Get state request for Tuneshine")
+    
+    requested_state = wifi.get_tuneshine_state_request(wdt)
+    
+    if requested_state:
+        count = 0
+        if tuneshine_state == False:
+            trip_power()
+            print("Requested tuneshine: on")
+            tuneshine_pin.on()
+            tuneshine_state = True
         
-        requested_state = wifi.get_tuneshine_state_request(wdt)
+    else:
+        print("Requested tuneshine: off")
+        tuneshine_pin.off()
+        tuneshine_state = False
         
-        # Turn on once every half hour, to keep battery from going to sleep
-        if requested_state:
-            print("Requested to be on")
-            relay_pin.on()
-            led_pin.on()
-            count = 0
-        elif count >= 30:
-            count = 0
-            wifi.send_log(ujson.dumps({"power_bump": True}), wdt)
-            relay_pin.on()
-            
-            wdt.feed()
-            machine.lightsleep(5000)
-            relay_pin.off()
-
-        else:
-            print("Requested to be off")
-            relay_pin.off()
-            led_pin.off()
-        
+    if count >= 20:
+        count = 0
+        trip_power()
+    
+    wdt.feed()
+    feed_loop_delay_s = 5
+    for i in range(60 // feed_loop_delay_s):
+        machine.lightsleep(feed_loop_delay_s * 1000)
         wdt.feed()
-        print("Sleep 56")
-        for i in range(8):
-            machine.lightsleep(7000)
-            wdt.feed()
-            
-    except Exception as e:
-
-        with open("error.log", "w+") as f:
-            f.write(traceback.format_exception(e))
-        time.sleep(1)
-        machine.reset()
