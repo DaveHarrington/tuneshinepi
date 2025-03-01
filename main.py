@@ -13,7 +13,7 @@ import set_rtc
 
 tuneshine_pin = Pin(19, Pin.OUT)
 power_relay_pin = Pin(0, Pin.OUT)
-power_relay_pin.on()
+power_relay_pin.off()
 
 print("Start up delay - 3s")
 # Delay to allow interupting before Watchdog is enabled
@@ -52,11 +52,12 @@ with open("error.log", "w+") as f:
         f.write("")
 
 def trip_power():
-    print("Requested power relay: off")
-    power_relay_pin.off()
-    machine.lightsleep(1000)
-    print("Requested power relay: on")
+    print("Requested power relay off")
     power_relay_pin.on()
+
+    time.sleep(3)
+    print("Requested power relay on")
+    power_relay_pin.off()
     
 count = 0
 tuneshine_state = False
@@ -79,7 +80,7 @@ while True:
         tuneshine_pin.off()
         tuneshine_state = False
         
-    if count >= 20:
+    if count >= 30:
         count = 0
         trip_power()
     
